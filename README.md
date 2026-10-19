@@ -92,6 +92,12 @@ python -m streamlit run dashboard/app.py
 
 Streamlit will open the dashboard in your browser.
 
+## 🚀 Live Dashboard
+
+**[Open the Interactive Sales Dashboard](YOUR_STREAMLIT_APP_URL)**
+
+Explore sales performance by region, category, and date. The dashboard includes key performance indicators, interactive charts, product analysis, and downloadable data.
+
 ## SQL Analysis
 
 The SQL script in `sql/sales_analysis.sql` includes queries for:
