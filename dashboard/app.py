@@ -222,7 +222,7 @@ st.markdown(
         background-color: #E6FFFA;
     }
 
-    /* Sidebar headings and labels */
+    /* Sidebar text */
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3,
@@ -231,18 +231,18 @@ st.markdown(
         color: #134E4A !important;
     }
 
-    /* Dropdown borders */
+    /* Sidebar dropdowns */
     [data-testid="stSidebar"] [data-baseweb="select"] > div {
         border: 1px solid #5EEAD4 !important;
         border-radius: 8px !important;
     }
 
-    /* KPI cards */
+    /* Compact KPI cards */
     div[data-testid="stMetric"] {
         background-color: #F0FDFA;
         border: 1px solid #99F6E4;
-        padding: 14px;
-        border-radius: 12px;
+        padding: 8px 12px;
+        border-radius: 10px;
     }
 
     div[data-testid="stMetricLabel"] p {
@@ -252,11 +252,42 @@ st.markdown(
 
     div[data-testid="stMetricValue"] {
         color: #0F766E;
+        font-size: 1.35rem;
+    }
+
+    /* Compact dashboard spacing */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0.5rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 100%;
+    }
+
+    [data-testid="stVerticalBlock"] {
+        gap: 0.65rem;
+    }
+
+    /* Compact headings and dividers */
+    h1 {
+        font-size: 1.65rem !important;
+    }
+
+    h2, h3 {
+        margin-top: 0.35rem !important;
+        margin-bottom: 0.35rem !important;
+    }
+
+    hr {
+        margin-top: 0.4rem;
+        margin-bottom: 0.4rem;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
+
+
 
 
 # Four KPI cards
