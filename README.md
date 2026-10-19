@@ -99,7 +99,11 @@ An interactive sales analytics dashboard built using Python and Streamlit to exp
 
 ## 🚀 Live Dashboard
 
-**[Click here to view the live Sales Data Analysis Dashboard](https://sales-data-analysis-pq3hduvssxxpflkzqkzwfg.streamlit.app/)**
+**[Click here to view the live Sales Data Analysis Dashboard](
+<a href="https://sales-data-analysis-pq3hduvssxxpflkzqkzwfg.streamlit.app/" target="_blank" rel="noopener noreferrer">
+  🚀 Click here to view the live Sales Data Analysis Dashboard
+</a>
+)**
 
 ## 💻 GitHub Repository
 
