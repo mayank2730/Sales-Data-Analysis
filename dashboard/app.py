@@ -1,10 +1,12 @@
 
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Dashboard colour theme
+# --------------------------------------------------
+# 1. Dashboard configuration
+# --------------------------------------------------
+
 TEAL = "#0F766E"
 TURQUOISE = "#14B8A6"
 LIGHT_TURQUOISE = "#CCFBF1"
@@ -17,10 +19,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-##st.title("📊 Sales Performance Dashboard")
+# --------------------------------------------------
+# 2. Dashboard header
+# --------------------------------------------------
 
-
-# Dashboard header
 st.markdown(
     """
     <div style="
@@ -34,7 +36,6 @@ st.markdown(
             font-size: 13px;
             font-weight: 600;
             letter-spacing: 2px;
-            text-transform: uppercase;
         ">
             SALES INTELLIGENCE
         </div>
@@ -59,42 +60,125 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# --------------------------------------------------
+# 3. Dashboard styling
+# --------------------------------------------------
+
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        background-color: #E6FFFA;
+    }
+
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] p {
+        color: #134E4A !important;
+    }
+
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {
+        border: 1px solid #5EEAD4 !important;
+        border-radius: 8px !important;
+    }
+
+    div[data-testid="stMetric"] {
+        background-color: #F0FDFA;
+        border: 1px solid #99F6E4;
+        padding: 10px 12px;
+        border-radius: 10px;
+    }
+
+    div[data-testid="stMetricLabel"] p {
+        color: #134E4A;
+        font-weight: 600;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #0F766E;
+        font-size: 1.35rem;
+    }
+
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 100%;
+    }
+
+    h1 {
+        font-size: 1.65rem !important;
+    }
+
+    h2, h3 {
+        margin-top: 0.35rem !important;
+        margin-bottom: 0.35rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.divider()
 
-# Load the complete dataset
-df = pd.read_csv("data/superstore_full.csv")
+# --------------------------------------------------
+# 4. Load and prepare dataset
+# --------------------------------------------------
 
-# Convert dates into datetime format
-df["Order Date"] = pd.to_datetime(
-    df["Order Date"],
-    format="%d/%m/%y"
-)
+@st.cache_data
+def load_data():
+    data = pd.read_csv("data/superstore_full.csv")
+
+    data["Order Date"] = pd.to_datetime(
+        data["Order Date"],
+        format="%d/%m/%y"
+    )
+
+    data["Ship Date"] = pd.to_datetime(
+        data["Ship Date"],
+        format="%d/%m/%y"
+    )
+
+    data["Order Month"] = (
+        data["Order Date"].dt.to_period("M").astype(str)
+    )
+
+    return data
 
 
+try:
+    df = load_data()
+except FileNotFoundError:
+    st.error(
+        "Dataset not found. Please check that "
+        "'data/superstore_full.csv' exists in your project folder."
+    )
+    st.stop()
+except (KeyError, ValueError) as error:
+    st.error(f"Please check the dataset columns and date formats: {error}")
+    st.stop()
 
-df["Ship Date"] = pd.to_datetime(
-    df["Ship Date"],
-    format="%d/%m/%y"
-)
+# --------------------------------------------------
+# 5. Sidebar filters
+# --------------------------------------------------
 
-# Create a month column from the order date
-df["Order Month"] = df["Order Date"].dt.to_period("M").astype(str)
-
-# Region filter in sidebar
 st.sidebar.header("Dashboard Filters")
 
 selected_region = st.sidebar.selectbox(
     "Select Region",
-    ["All Regions"] + sorted(df["Region"].unique().tolist())
+    ["All Regions"] + sorted(df["Region"].dropna().unique().tolist())
 )
 
-# Category filter in sidebar
 selected_category = st.sidebar.selectbox(
     "Select Category",
-    ["All Categories"] + sorted(df["Category"].unique().tolist())
+    ["All Categories"] + sorted(
+        df["Category"].dropna().unique().tolist()
+    )
 )
 
-# Date range filter
 start_date = st.sidebar.date_input(
     "Start Date",
     value=df["Order Date"].min().date(),
@@ -109,24 +193,28 @@ end_date = st.sidebar.date_input(
     max_value=df["Order Date"].max().date()
 )
 
-# Apply the selected region filter
-if selected_region == "All Regions":
-    filtered_df = df.copy()
-else:
-    filtered_df = df[df["Region"] == selected_region]
+if start_date > end_date:
+    st.error("Start Date cannot be later than End Date.")
+    st.stop()
 
-# Apply the selected date range
-filtered_df = filtered_df[
-    (filtered_df["Order Date"] >= pd.Timestamp(start_date)) &
-    (filtered_df["Order Date"] <= pd.Timestamp(end_date))
-]
+# --------------------------------------------------
+# 6. Apply filters
+# --------------------------------------------------
 
-# Apply the selected category filter
+filtered_df = df[
+    (df["Order Date"] >= pd.Timestamp(start_date)) &
+    (df["Order Date"] < pd.Timestamp(end_date) + pd.Timedelta(days=1))
+].copy()
+
+if selected_region != "All Regions":
+    filtered_df = filtered_df[
+        filtered_df["Region"] == selected_region
+    ]
+
 if selected_category != "All Categories":
     filtered_df = filtered_df[
         filtered_df["Category"] == selected_category
     ]
-
 
 st.markdown(
     f"""
@@ -148,10 +236,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-# Calculate key business metrics using the selected region
-
-# Handle empty filter results
 if filtered_df.empty:
     st.warning(
         "No records match your selected filters. "
@@ -159,37 +243,36 @@ if filtered_df.empty:
     )
     st.stop()
 
-# Calculate key business metrics
+# --------------------------------------------------
+# 7. Calculate KPIs
+# --------------------------------------------------
+
 total_sales = filtered_df["Sales"].sum()
 total_profit = filtered_df["Profit"].sum()
 total_quantity = filtered_df["Quantity"].sum()
 
-# Calculate profit margin
 profit_margin = (
-    (total_profit / total_sales) * 100
-    if total_sales != 0
-    else 0
+    total_profit / total_sales * 100
+    if total_sales != 0 else 0
 )
 
-
-# Compare sales with the previous period of equal length
+# Compare against the previous period of equal length
 period_days = (end_date - start_date).days + 1
 
-previous_start = start_date - pd.Timedelta(days=period_days)
-previous_end = start_date - pd.Timedelta(days=1)
+previous_start = (
+    pd.Timestamp(start_date) - pd.Timedelta(days=period_days)
+)
 
 previous_df = df[
-    (df["Order Date"] >= pd.Timestamp(previous_start)) &
+    (df["Order Date"] >= previous_start) &
     (df["Order Date"] < pd.Timestamp(start_date))
-]
+].copy()
 
-# Apply the same region filter
 if selected_region != "All Regions":
     previous_df = previous_df[
         previous_df["Region"] == selected_region
     ]
 
-# Apply the same category filter
 if selected_category != "All Categories":
     previous_df = previous_df[
         previous_df["Category"] == selected_category
@@ -197,244 +280,210 @@ if selected_category != "All Categories":
 
 previous_sales = previous_df["Sales"].sum()
 
-# Calculate percentage change safely
-if previous_sales != 0:
+if previous_sales > 0:
     sales_change_pct = (
         (total_sales - previous_sales) / previous_sales
     ) * 100
 else:
     sales_change_pct = None
 
+# --------------------------------------------------
+# 8. KPI cards
+# --------------------------------------------------
 
+kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5, gap="small")
 
+with kpi1:
+    st.metric("💰 Total Sales", f"${total_sales:,.2f}")
 
+with kpi2:
+    st.metric("📈 Total Profit", f"${total_profit:,.2f}")
 
-# Dashboard styling
-st.markdown(
-    """
-    <style>
-    /* Sidebar background */
-    [data-testid="stSidebar"] {
-        background-color: #E6FFFA;
-    }
+with kpi3:
+    st.metric("📦 Quantity Sold", f"{total_quantity:,.0f}")
 
-    [data-testid="stSidebar"] > div:first-child {
-        background-color: #E6FFFA;
-    }
+with kpi4:
+    st.metric("📊 Profit Margin", f"{profit_margin:.2f}%")
 
-    /* Sidebar text */
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3,
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] p {
-        color: #134E4A !important;
-    }
-
-    /* Sidebar dropdowns */
-    [data-testid="stSidebar"] [data-baseweb="select"] > div {
-        border: 1px solid #5EEAD4 !important;
-        border-radius: 8px !important;
-    }
-
-    /* Compact KPI cards */
-    div[data-testid="stMetric"] {
-        background-color: #F0FDFA;
-        border: 1px solid #99F6E4;
-        padding: 8px 12px;
-        border-radius: 10px;
-    }
-
-    div[data-testid="stMetricLabel"] p {
-        color: #134E4A;
-        font-weight: 600;
-    }
-
-    div[data-testid="stMetricValue"] {
-        color: #0F766E;
-        font-size: 1.35rem;
-    }
-
-    /* Compact dashboard spacing */
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 0.5rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-        max-width: 100%;
-    }
-
-    [data-testid="stVerticalBlock"] {
-        gap: 0.65rem;
-    }
-
-    /* Compact headings and dividers */
-    h1 {
-        font-size: 1.65rem !important;
-    }
-
-    h2, h3 {
-        margin-top: 0.35rem !important;
-        margin-bottom: 0.35rem !important;
-    }
-
-    hr {
-        margin-top: 0.4rem;
-        margin-bottom: 0.4rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-
-
-# Four KPI cards
-
-# KPI cards - two rows for better readability
-
-# First row: three KPI cards
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric(
-        label="💰 Total Sales",
-        value=f"${total_sales:,.2f}"
-    )
-
-with col2:
-    st.metric(
-        label="📈 Total Profit",
-        value=f"${total_profit:,.2f}"
-    )
-
-with col3:
-    st.metric(
-        label="📦 Quantity Sold",
-        value=f"{total_quantity:,.0f}"
-    )
-
-# Second row: two KPI cards
-st.markdown("")
-
-col4, col5 = st.columns(2)
-
-with col4:
-    st.metric(
-        label="📊 Profit Margin",
-        value=f"{profit_margin:.2f}%"
-    )
-
-with col5:
+with kpi5:
     if sales_change_pct is None:
         st.metric(
-            label="📈 Sales Change",
-            value="N/A",
-            help="Previous period has no recorded sales."
+            "📉 Sales Change",
+            "N/A",
+            help="No positive previous-period sales available."
         )
-        st.caption("No previous-period data")
     else:
         st.metric(
-            label="📈 Sales Change",
-            value=f"{sales_change_pct:+.2f}%",
+            "📉 Sales Change",
+            f"{sales_change_pct:+.2f}%",
             delta=f"{sales_change_pct:+.2f}%",
             help="Compared with the previous period of equal length."
         )
 
-
-
-
 st.divider()
 
+# --------------------------------------------------
+# 9. Sales by Category
+# 10. Profit by Region
+# --------------------------------------------------
 
-# Sales by category
-chart_col1, chart_col2 = st.columns(2)
+chart_col1, chart_col2 = st.columns(2, gap="large")
+
 with chart_col1:
     st.subheader("Sales by Category")
 
     category_sales = (
-        filtered_df.groupby("Category")["Sales"]
+        filtered_df.groupby("Category", as_index=False)["Sales"]
         .sum()
-        .reset_index()
         .sort_values("Sales", ascending=False)
-)
+    )
 
-    
     fig_category = px.bar(
         category_sales,
         x="Category",
         y="Sales",
-        title="Sales by Category",
         text_auto=".2s",
-        color_discrete_sequence=[TURQUOISE]
-)
+        color="Category",
+        color_discrete_sequence=[
+            TEAL, TURQUOISE, "#5EEAD4"
+        ],
+        template="plotly_white"
+    )
 
+    fig_category.update_traces(
+        textposition="outside",
+        cliponaxis=False
+    )
 
-
-    
     fig_category.update_layout(
+        height=360,
+        title="Sales by Category",
+        title_font_color=DARK_TEAL,
+        font=dict(color=DARK_TEAL),
         xaxis_title="Category",
         yaxis_title="Sales ($)",
-        title_font_color=DARK_TEAL,
-        title_font_size=16,
-        font_color=DARK_TEAL,
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        margin=dict(l=10, r=10, t=45, b=10),
+        margin=dict(l=15, r=15, t=55, b=15),
         showlegend=False
-)
+    )
 
+    fig_category.update_yaxes(
+        tickprefix="$",
+        separatethousands=True,
+        gridcolor="#E2E8F0",
+        zeroline=False
+    )
 
     st.plotly_chart(
-    fig_category,
-    use_container_width=True,
-    config={"displayModeBar": False}
-)
+        fig_category,
+        use_container_width=True,
+        config={"displayModeBar": False}
+    )
 
+with chart_col2:
+    st.subheader("Profit by Region")
 
-# Monthly sales trend
-st.subheader("Monthly Sales Trend")
+    region_profit = (
+        filtered_df.groupby("Region", as_index=False)["Profit"]
+        .sum()
+        .sort_values("Profit", ascending=False)
+    )
 
+    fig_region = px.bar(
+        region_profit,
+        x="Region",
+        y="Profit",
+        text_auto=".2s",
+        color="Region",
+        color_discrete_sequence=[
+            TEAL, TURQUOISE, "#5EEAD4", "#99F6E4"
+        ],
+        template="plotly_white"
+    )
 
+    fig_region.update_traces(
+        textposition="outside",
+        cliponaxis=False
+    )
 
+    fig_region.update_layout(
+        height=360,
+        title="Profit by Region",
+        title_font_color=DARK_TEAL,
+        font=dict(color=DARK_TEAL),
+        xaxis_title="Region",
+        yaxis_title="Profit ($)",
+        margin=dict(l=15, r=15, t=55, b=15),
+        showlegend=False
+    )
+
+    fig_region.update_yaxes(
+        tickprefix="$",
+        separatethousands=True,
+        gridcolor="#E2E8F0",
+        zeroline=True,
+        zerolinecolor="#94A3B8"
+    )
+
+    st.plotly_chart(
+        fig_region,
+        use_container_width=True,
+        config={"displayModeBar": False}
+    )
+
+# --------------------------------------------------
+# 11. Monthly Sales Trend — full dashboard width
+# --------------------------------------------------
+
+st.subheader("📈 Monthly Sales Trend")
 
 monthly_sales = (
-    filtered_df.groupby("Order Month")["Sales"]
+    filtered_df.groupby("Order Month", as_index=False)["Sales"]
     .sum()
-    .reset_index()
+    .sort_values("Order Month")
 )
-
-# Create the line chart
 
 fig_monthly = px.line(
     monthly_sales,
     x="Order Month",
     y="Sales",
-    title="Monthly Sales Trend",
     markers=True,
-    line_shape="linear"
+    template="plotly_white",
+    color_discrete_sequence=[TEAL],
+    labels={
+        "Order Month": "Month",
+        "Sales": "Total Sales ($)"
+    }
 )
 
 fig_monthly.update_traces(
-    line=dict(color=TEAL, width=3),
-    marker=dict(color=TURQUOISE, size=6)
+    line=dict(width=3),
+    marker=dict(
+        color=TURQUOISE,
+        size=7,
+        line=dict(color="white", width=1)
+    ),
+    hovertemplate=(
+        "Month: %{x}<br>"
+        "Sales: $%{y:,.2f}"
+        "<extra></extra>"
+    )
 )
-
-
 
 fig_monthly.update_layout(
-    xaxis_title="Month",
-    yaxis_title="Sales ($)",
-    title_font_color=DARK_TEAL,
-    title_font_size=16,
-    font_color=DARK_TEAL,
-    plot_bgcolor="white",
-    paper_bgcolor="white",
-    margin=dict(l=10, r=10, t=45, b=10),
-    showlegend=False
+    height=400,
+    font=dict(color=DARK_TEAL),
+    margin=dict(l=20, r=20, t=25, b=20),
+    hovermode="x unified"
 )
 
+fig_monthly.update_yaxes(
+    tickprefix="$",
+    separatethousands=True,
+    gridcolor="#E2E8F0",
+    zeroline=False
+)
+
+fig_monthly.update_xaxes(showgrid=False)
 
 st.plotly_chart(
     fig_monthly,
@@ -442,94 +491,73 @@ st.plotly_chart(
     config={"displayModeBar": False}
 )
 
+# --------------------------------------------------
+# 12. Year-over-Year Sales Comparison
+# --------------------------------------------------
 
-# Profit by region
-with chart_col2:
-    st.subheader("Profit by Region")
-
-    region_profit = (
-        filtered_df.groupby("Region")["Profit"]
-        .sum()
-        .reset_index()
-        .sort_values("Profit", ascending=False)
-)
-
-    
-    fig_region = px.bar(
-        region_profit,
-        x="Region",
-        y="Profit",
-        title="Profit by Region",
-        text_auto=".2s",
-        color_discrete_sequence=[TEAL]
-)
-
-
-
-    
-    fig_region.update_layout(
-        xaxis_title="Region",
-        yaxis_title="Profit ($)",
-        title_font_color=DARK_TEAL,
-        title_font_size=16,
-        font_color=DARK_TEAL,
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        margin=dict(l=10, r=10, t=45, b=10),
-        showlegend=False
-)
-
-
-    st.plotly_chart(
-    fig_region,
-    use_container_width=True,
-    config={"displayModeBar": False}
-)
-    
-
-# Year-over-Year Sales Comparison
 st.subheader("📅 Year-over-Year Sales Comparison")
 
 yearly_sales = filtered_df.copy()
-
 yearly_sales["Year"] = yearly_sales["Order Date"].dt.year
 
 yearly_summary = (
-    yearly_sales.groupby("Year")["Sales"]
+    yearly_sales.groupby("Year", as_index=False)["Sales"]
     .sum()
-    .reset_index()
+    .sort_values("Year")
 )
 
-yearly_summary["Year"] = yearly_summary["Year"].astype(str)
-
-# Calculate year-over-year sales growth
 yearly_summary["Sales Growth (%)"] = (
     yearly_summary["Sales"].pct_change() * 100
 )
+
+yearly_summary["Year"] = yearly_summary["Year"].astype(str)
 
 fig_yearly = px.bar(
     yearly_summary,
     x="Year",
     y="Sales",
     text="Sales",
-    title="Annual Sales Performance",
-    color="Sales",
-    color_continuous_scale=["#CCFBF1", "#14B8A6", "#0F766E"]
+    template="plotly_white",
+    color_discrete_sequence=[TEAL],
+    labels={
+        "Year": "Year",
+        "Sales": "Total Sales ($)"
+    },
+    hover_data={
+        "Sales": ":$,.2f",
+        "Sales Growth (%)": ":.2f"
+    }
 )
 
 fig_yearly.update_traces(
     texttemplate="$%{text:,.0f}",
-    textposition="outside"
+    textposition="outside",
+    cliponaxis=False,
+    hovertemplate=(
+        "Year: %{x}<br>"
+        "Total Sales: $%{y:,.2f}"
+        "<extra></extra>"
+    )
 )
 
 fig_yearly.update_layout(
-    xaxis_title="Year",
-    yaxis_title="Total Sales ($)",
-    coloraxis_showscale=False,
-    plot_bgcolor="white",
-    paper_bgcolor="white",
-    font=dict(color="#134E4A"),
-    margin=dict(l=20, r=20, t=60, b=20)
+    height=420,
+    showlegend=False,
+    font=dict(color=DARK_TEAL),
+    margin=dict(l=20, r=30, t=30, b=20),
+    xaxis=dict(
+        title="Year",
+        type="category",
+        showgrid=False
+    ),
+    yaxis=dict(
+        title="Total Sales ($)",
+        tickprefix="$",
+        tickformat=",.0f",
+        gridcolor="#E5E7EB",
+        zeroline=False
+    ),
+    bargap=0.35
 )
 
 st.plotly_chart(
@@ -538,7 +566,10 @@ st.plotly_chart(
     config={"displayModeBar": False}
 )
 
-# Display annual sales growth
+# --------------------------------------------------
+# 13. Annual Sales Growth Table
+# --------------------------------------------------
+
 st.subheader("📈 Annual Sales Growth")
 
 growth_summary = yearly_summary.copy()
@@ -559,44 +590,48 @@ st.dataframe(
     hide_index=True
 )
 
-# Top 10 Products by Sales
-st.subheader("Top 10 Products by Sales")
+# --------------------------------------------------
+# 14. Top 10 Products by Sales
+# --------------------------------------------------
+
+st.subheader("🏆 Top 10 Products by Sales")
 
 top_products = (
-    filtered_df.groupby("Product Name")["Sales"]
+    filtered_df.groupby("Product Name", as_index=False)["Sales"]
     .sum()
-    .reset_index()
     .sort_values("Sales", ascending=False)
     .head(10)
+    .sort_values("Sales", ascending=True)
 )
-
-# Create the Top 10 Products chart
 
 fig_products = px.bar(
     top_products,
     x="Sales",
     y="Product Name",
     orientation="h",
-    title="Top 10 Products by Sales",
     text_auto=".2s",
-    color_discrete_sequence=[TURQUOISE]
+    template="plotly_white",
+    color_discrete_sequence=[TURQUOISE],
+    labels={
+        "Sales": "Sales ($)",
+        "Product Name": "Product"
+    }
 )
 
-
-
 fig_products.update_layout(
-    xaxis_title="Sales ($)",
-    yaxis_title="Product",
-    title_font_color=DARK_TEAL,
-    title_font_size=16,
-    font_color=DARK_TEAL,
+    height=450,
+    font=dict(color=DARK_TEAL),
     plot_bgcolor="white",
     paper_bgcolor="white",
-    margin=dict(l=10, r=10, t=45, b=10),
-    yaxis={"categoryorder": "total ascending"},
+    margin=dict(l=10, r=20, t=25, b=10),
     showlegend=False
 )
 
+fig_products.update_xaxes(
+    tickprefix="$",
+    separatethousands=True,
+    gridcolor="#E2E8F0"
+)
 
 st.plotly_chart(
     fig_products,
@@ -604,44 +639,50 @@ st.plotly_chart(
     config={"displayModeBar": False}
 )
 
+# --------------------------------------------------
+# 15. Profit by Sub-Category
+# --------------------------------------------------
 
-# Profit by Sub-Category
-st.subheader("Profit by Sub-Category")
+st.subheader("💹 Profit by Sub-Category")
 
 subcategory_profit = (
-    filtered_df.groupby("Sub-Category")["Profit"]
+    filtered_df.groupby("Sub-Category", as_index=False)["Profit"]
     .sum()
-    .reset_index()
     .sort_values("Profit", ascending=True)
 )
-# Create the Profit by Sub-Category chart
 
 fig_subcategory = px.bar(
     subcategory_profit,
     x="Profit",
     y="Sub-Category",
     orientation="h",
-    title="Profit by Sub-Category",
     text_auto=".2s",
+    template="plotly_white",
     color="Profit",
-    color_continuous_scale=["#F87171", "#CCFBF1", "#0F766E"],
-    color_continuous_midpoint=0
+    color_continuous_scale=[
+        "#F87171", "#CCFBF1", "#0F766E"
+    ],
+    color_continuous_midpoint=0,
+    labels={
+        "Profit": "Profit ($)",
+        "Sub-Category": "Sub-Category"
+    }
 )
-
-
 
 fig_subcategory.update_layout(
-    xaxis_title="Profit ($)",
-    yaxis_title="Sub-Category",
-    title_font_color=DARK_TEAL,
-    title_font_size=16,
-    font_color=DARK_TEAL,
-    plot_bgcolor="white",
-    paper_bgcolor="white",
-    margin=dict(l=10, r=10, t=45, b=10),
-    showlegend=False
+    height=500,
+    font=dict(color=DARK_TEAL),
+    margin=dict(l=10, r=10, t=25, b=10),
+    coloraxis_showscale=False
 )
 
+fig_subcategory.update_xaxes(
+    tickprefix="$",
+    separatethousands=True,
+    gridcolor="#E2E8F0",
+    zeroline=True,
+    zerolinecolor="#64748B"
+)
 
 st.plotly_chart(
     fig_subcategory,
@@ -649,127 +690,136 @@ st.plotly_chart(
     config={"displayModeBar": False}
 )
 
+# --------------------------------------------------
+# 16. Business Insights
+# --------------------------------------------------
 
-
-# Business Insights
 st.subheader("💡 Business Insights")
 
-if not filtered_df.empty:
-    # Calculate profit by sub-category
-    profit_by_subcategory = (
-        filtered_df.groupby("Sub-Category")["Profit"].sum()
+profit_by_subcategory = (
+    filtered_df.groupby("Sub-Category")["Profit"].sum()
+)
+
+sales_by_category = (
+    filtered_df.groupby("Category")["Sales"].sum()
+)
+
+best_subcategory = profit_by_subcategory.idxmax()
+best_profit = profit_by_subcategory.max()
+
+worst_subcategory = profit_by_subcategory.idxmin()
+worst_profit = profit_by_subcategory.min()
+
+best_category = sales_by_category.idxmax()
+best_category_sales = sales_by_category.max()
+
+insight1, insight2, insight3 = st.columns(3)
+
+with insight1:
+    st.markdown(
+        f"""
+        <div style="
+            background-color: #F0FDFA;
+            border: 1px solid #99F6E4;
+            border-radius: 12px;
+            padding: 18px;
+            min-height: 135px;
+        ">
+            <div style="color: #134E4A; font-size: 14px;">
+                🏆 Most Profitable Sub-Category
+            </div>
+            <div style="
+                color: #0F766E;
+                font-size: 22px;
+                font-weight: 700;
+                margin-top: 10px;
+            ">
+                {best_subcategory}
+            </div>
+            <div style="color: #134E4A; font-size: 14px;">
+                Profit: ${best_profit:,.2f}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    best_subcategory = profit_by_subcategory.idxmax()
-    best_profit = profit_by_subcategory.max()
-
-    worst_subcategory = profit_by_subcategory.idxmin()
-    worst_profit = profit_by_subcategory.min()
-
-    # Calculate sales by category
-    sales_by_category = (
-        filtered_df.groupby("Category")["Sales"].sum()
+with insight2:
+    st.markdown(
+        f"""
+        <div style="
+            background-color: #F0FDFA;
+            border: 1px solid #99F6E4;
+            border-radius: 12px;
+            padding: 18px;
+            min-height: 135px;
+        ">
+            <div style="color: #134E4A; font-size: 14px;">
+                📈 Top Sales Category
+            </div>
+            <div style="
+                color: #0F766E;
+                font-size: 22px;
+                font-weight: 700;
+                margin-top: 10px;
+            ">
+                {best_category}
+            </div>
+            <div style="color: #134E4A; font-size: 14px;">
+                Sales: ${best_category_sales:,.2f}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    best_category = sales_by_category.idxmax()
-    best_category_sales = sales_by_category.max()
-
-    # Display insights in three columns
-    insight1, insight2, insight3 = st.columns(3)
-
-    with insight1:
-        st.markdown(
-            f"""
-            <div style="
-                background-color: #F0FDFA;
-                border: 1px solid #99F6E4;
-                border-radius: 12px;
-                padding: 18px;
-                min-height: 135px;
-            ">
-                <div style="color: #134E4A; font-size: 14px;">
-                    🏆 Most Profitable Sub-Category
-                </div>
-                <div style="color: #0F766E; font-size: 22px;
-                            font-weight: 700; margin-top: 10px;">
-                    {best_subcategory}
-                </div>
-                <div style="color: #134E4A; font-size: 14px;">
-                    Profit: ${best_profit:,.2f}
-                </div>
+with insight3:
+    st.markdown(
+        f"""
+        <div style="
+            background-color: #FFF7F7;
+            border: 1px solid #FECACA;
+            border-radius: 12px;
+            padding: 18px;
+            min-height: 135px;
+        ">
+            <div style="color: #991B1B; font-size: 14px;">
+                ⚠️ Lowest-Profit Sub-Category
             </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with insight2:
-        st.markdown(
-            f"""
             <div style="
-                background-color: #F0FDFA;
-                border: 1px solid #99F6E4;
-                border-radius: 12px;
-                padding: 18px;
-                min-height: 135px;
+                color: #B91C1C;
+                font-size: 22px;
+                font-weight: 700;
+                margin-top: 10px;
             ">
-                <div style="color: #134E4A; font-size: 14px;">
-                    📈 Top Sales Category
-                </div>
-                <div style="color: #0F766E; font-size: 22px;
-                            font-weight: 700; margin-top: 10px;">
-                    {best_category}
-                </div>
-                <div style="color: #134E4A; font-size: 14px;">
-                    Sales: ${best_category_sales:,.2f}
-                </div>
+                {worst_subcategory}
             </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with insight3:
-        st.markdown(
-            f"""
-            <div style="
-                background-color: #FFF7F7;
-                border: 1px solid #FECACA;
-                border-radius: 12px;
-                padding: 18px;
-                min-height: 135px;
-            ">
-                <div style="color: #991B1B; font-size: 14px;">
-                    ⚠️ Lowest-Profit Sub-Category
-                </div>
-                <div style="color: #B91C1C; font-size: 22px;
-                            font-weight: 700; margin-top: 10px;">
-                    {worst_subcategory}
-                </div>
-                <div style="color: #991B1B; font-size: 14px;">
-                    Profit: ${worst_profit:,.2f}
-                </div>
+            <div style="color: #991B1B; font-size: 14px;">
+                Profit: ${worst_profit:,.2f}
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-else:
-    st.warning("No data available for the selected filters.")
+# --------------------------------------------------
+# 17. Loss-Making Sub-Categories
+# --------------------------------------------------
 
-
-
-
-
-# Identify loss-making subcategories
 st.subheader("⚠️ Loss-Making Sub-Categories")
 
 loss_subcategories = (
-    subcategory_profit[subcategory_profit["Profit"] < 0]
+    subcategory_profit[
+        subcategory_profit["Profit"] < 0
+    ]
     .sort_values("Profit")
     .copy()
 )
 
 if loss_subcategories.empty:
-    st.info("No loss-making subcategories found for the selected filters.")
+    st.info(
+        "No loss-making subcategories found for the selected filters."
+    )
 else:
     loss_subcategories["Profit"] = loss_subcategories["Profit"].map(
         lambda value: f"-${abs(value):,.2f}"
@@ -781,26 +831,37 @@ else:
         hide_index=True
     )
 
+# --------------------------------------------------
+# 18. Download Filtered Data
+# --------------------------------------------------
 
+st.subheader("📥 Download Filtered Data")
 
-# Download filtered data
 csv_data = filtered_df.to_csv(index=False).encode("utf-8")
 
 st.download_button(
-    label="📥 Download Filtered Data (CSV)",
+    label="Download Filtered Data (CSV)",
     data=csv_data,
     file_name="filtered_sales_data.csv",
     mime="text/csv"
 )
-# Display dataset information
-st.subheader("Filtered Dataset Preview")
 
-st.write("Number of filtered records:", len(filtered_df))
-st.write("Number of columns:", len(filtered_df.columns))
+# --------------------------------------------------
+# 19. Dataset Preview
+# --------------------------------------------------
+
+st.subheader("🔎 Filtered Dataset Preview")
+
+info1, info2 = st.columns(2)
+
+with info1:
+    st.metric("Filtered Records", f"{len(filtered_df):,}")
+
+with info2:
+    st.metric("Number of Columns", f"{len(filtered_df.columns):,}")
 
 st.dataframe(
     filtered_df.head(10),
-    use_container_width=True
+    use_container_width=True,
+    hide_index=True
 )
-
-
