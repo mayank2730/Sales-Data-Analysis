@@ -92,11 +92,59 @@ python -m streamlit run dashboard/app.py
 
 Streamlit will open the dashboard in your browser.
 
+
+# Sales Data Analysis Dashboard
+
+An interactive sales analytics dashboard built using Python and Streamlit to explore sales performance, profit, product categories, and business trends.
+
 ## 🚀 Live Dashboard
 
-**[Open the Interactive Sales Dashboard](YOUR_STREAMLIT_APP_URL)**
+**[Click here to view the live Sales Data Analysis Dashboard](https://sales-data-analysis-pq3hduvssxxpflkzqkzwfg.streamlit.app/)**
 
-Explore sales performance by region, category, and date. The dashboard includes key performance indicators, interactive charts, product analysis, and downloadable data.
+## 💻 GitHub Repository
+
+[View the source code](https://github.com/mayank2730/Sales-Data-Analysis)
+
+## 🛠️ Technologies Used
+
+- Python
+- Pandas
+- Streamlit
+- Data Visualization
+
+## ✨ Key Features
+
+- Interactive sales data analysis
+- Sales and profit performance tracking
+- Category and product-level insights
+- Visual exploration of business trends
+
+## ⚙️ Run Locally
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/mayank2730/Sales-Data-Analysis.git
+   ```
+
+2. Navigate to the project folder:
+
+   ```bash
+   cd Sales-Data-Analysis
+   ```
+
+3. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Run the Streamlit application:
+
+   ```bash
+   streamlit run app.py
+   ```
+
 
 ## SQL Analysis
 
